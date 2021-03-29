@@ -99,14 +99,8 @@ def run_mcmc(w_tau, w_theta, w_t, tau, theta, t, data, nsample=10000):
             # Compute new components for the posterior that depend on ti.
             old_sum_term = sum_terms[j]
             new_sum_term = update_sum_term(theta, tau, t_new, xi, ni, lg_2theta)
-            # summed_terms = summed_terms + new_sum_term - old_sum_term
-
-            # Calculate the new log unnormalised posterior.
-            # new_lup = pre_sum_term + summed_terms
-
-            # ratio = new_lup - lup
-
             ratio = new_sum_term - old_sum_term
+
             # Accept the new theta value with the probability of the ratio of new to old posterior.
             if ratio >= 0 or random.random() < np.exp(ratio):
                 t[j] = t_new
@@ -120,7 +114,9 @@ def run_mcmc(w_tau, w_theta, w_t, tau, theta, t, data, nsample=10000):
         sample_theta.append(theta)
         if i % 100 == 0:
             # Uncomment to keep track of progress:
-            print(i)
+            # print(i)
+
+            # Save acceptance ratios
             running_accept_tau.append(accept_tau/1)
             running_accept_theta.append(accept_theta/1)
             running_accept_t.append(accept_theta/(1*1000))
@@ -152,6 +148,9 @@ def update_sum_term(theta, tau, ti, xi, ni, lg_2theta):
 
 
 def calculate_sum_terms(tau, theta, t, x, n, lg_2theta):
+    """
+    Calculates all the sum terms.
+    """
     sum_terms = []
     for xi, ni, ti in zip(x, n, t):
         sum_terms.append(lg_2theta - (2/theta)*ti + (xi * np.log(3/4-3*(np.exp(-8*(tau+ti)/3))/4)) +
@@ -257,35 +256,34 @@ def scale_search(scaling_factors, nsample=10000):
 
     # Loop over scaling factors to try.
     for i, s in enumerate(scaling_factors):
-        if s > 0.1:
-            num_sample = 1000
-        else:
-            num_sample = nsample
         s_tau, s_theta, p_accept_tau, p_accept_theta, p_accept_t = run_mcmc(w_tau=0.01*s, w_theta=0.01*s, w_t=0.002*s,
                                                                             tau=0.01, theta=0.001,
                                                                             t=t_init, data=sitesdiff,
-                                                                            nsample=num_sample)
+                                                                            nsample=nsample)
 
         # Calculate values for burn_in
         burn_in_tau = get_burn_in_duration(s_tau)
         burn_in_theta = get_burn_in_duration(s_theta)
+
+        # Create the joint distribution
         create_joint_distribution(s_tau, s_theta)
+
         # Plot results, along with acceptance ratios.
-        # plot_acceptance_ratios(p_accept_tau, p_accept_theta, p_accept_t, s)
-        # plot_solution_distibution(s_tau, s_theta, s, burn_in_tau, burn_in_theta)
-        #
-        # # Get parameters to save
-        # e_tau, e_theta = get_efficiency(s_tau, s_theta)
-        # tau_ci = stats.norm(*stats.norm.fit(s_tau)).interval(0.95)
-        # theta_ci = stats.norm(*stats.norm.fit(s_theta)).interval(0.95)
+        plot_acceptance_ratios(p_accept_tau, p_accept_theta, p_accept_t, s)
+        plot_solution_distibution(s_tau, s_theta, s, burn_in_tau, burn_in_theta)
+
+        # Get parameters to save
+        e_tau, e_theta = get_efficiency(s_tau, s_theta)
+        tau_ci = stats.norm(*stats.norm.fit(s_tau)).interval(0.95)
+        theta_ci = stats.norm(*stats.norm.fit(s_theta)).interval(0.95)
 
         # Add saved parameters to results
-        # search_results.loc[i] = [0.01*s, 0.01*s, 0.002*s, e_tau[0], e_theta[0],
-        #                          np.mean(p_accept_tau[1:]),  np.mean(p_accept_theta[1:]), np.mean(p_accept_t[1:]),
-        #                          np.mean(s_tau[burn_in_tau:]), np.mean(s_theta[burn_in_tau:]), tau_ci[0], tau_ci[1],
-        #                          theta_ci[0], theta_ci[1]]
+        search_results.loc[i] = [0.01*s, 0.01*s, 0.002*s, e_tau[0], e_theta[0],
+                                 np.mean(p_accept_tau[1:]),  np.mean(p_accept_theta[1:]), np.mean(p_accept_t[1:]),
+                                 np.mean(s_tau[burn_in_tau:]), np.mean(s_theta[burn_in_tau:]), tau_ci[0], tau_ci[1],
+                                 theta_ci[0], theta_ci[1]]
 
-    search_results.to_csv("./scale_search_results2.csv")
+    search_results.to_csv("./scale_search_results.csv")
     return search_results
 
 
@@ -293,21 +291,18 @@ def scale_search(scaling_factors, nsample=10000):
 random.seed(25)
 
 # Run scale search
-# df = scale_search([0.1, 0.08, 0.06], 100000)
-
-df = scale_search([2, 1, 0.5, 0.4, 0.3, 0.2, 0.1, 0.08, 0.06], 100000)
-# df = scale_search([0.2, 0.1, 0.08, 0.06], 10000)
-
+df = scale_search([2, 1, 0.5, 0.4, 0.3, 0.2, 0.1, 0.08, 0.06], 10000)
 
 # Run single search
-# sitesdiff = load_data()
-# t_init = [0.001 for i in range(1000)]
-# s=0.1
-# s_tau, s_theta, p_accept_tau, p_accept_theta, p_accept_t = run_mcmc(w_tau=0.01*s, w_theta=0.01*s, w_t=0.002*s,
-#                                                                             tau=0.01, theta=0.001,
-#                                                                             t=t_init, data=sitesdiff,
-#                                                                             nsample=10000)
-# plot_acceptance_ratios(p_accept_tau, p_accept_theta, p_accept_t, s)
-# burn_in_tau = get_burn_in_duration(s_tau)
-# burn_in_theta = get_burn_in_duration(s_theta)
-# plot_solution_distibution(s_tau, s_theta, s, burn_in_tau, burn_in_theta)
+sitesdiff = load_data()
+t_init = [0.001 for i in range(1000)]
+s = 0.1
+s_tau, s_theta, p_accept_tau, p_accept_theta, p_accept_t = run_mcmc(w_tau=0.01 * s, w_theta=0.01 * s, w_t=0.002 * s,
+                                                                    tau=0.01, theta=0.001,
+                                                                    t=t_init, data=sitesdiff,
+                                                                    nsample=100000)
+create_joint_distribution(s_tau, s_theta)
+plot_acceptance_ratios(p_accept_tau, p_accept_theta, p_accept_t, s)
+burn_in_tau = get_burn_in_duration(s_tau)
+burn_in_theta = get_burn_in_duration(s_theta)
+plot_solution_distibution(s_tau, s_theta, s, burn_in_tau, burn_in_theta)
